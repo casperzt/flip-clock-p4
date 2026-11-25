@@ -11,6 +11,17 @@
 - **联网**：ESP32-C6（esp_hosted / esp_wifi_remote）Wi-Fi + SNTP 自动对时；Open-Meteo 天气（可选按 IP 定位）
 - **USB 遥控**：电脑通过 USB 串口看屏并点击控制，不依赖 Wi-Fi（Base64 分帧 JPEG，320×533 @ ~8fps）
 
+
+## 截图
+
+| 时钟 | INFO 页 | 位置选择 |
+|---|---|---|
+| ![clock](docs/screenshots/clock.png) | ![info](docs/screenshots/info.png) | ![location](docs/screenshots/location.png) |
+
+Mac 端 USB 遥控窗口（点画面 = 点屏）：
+
+![remote](docs/screenshots/remote-app.png)
+
 ## 硬件
 
 | 项 | 说明 |
