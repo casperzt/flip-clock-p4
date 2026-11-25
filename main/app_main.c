@@ -41,6 +41,13 @@ static void handle_cmd(char *line)
         }
         return;
     }
+    if (strcmp(line, "SYNC") == 0) {
+        weather_refresh_now();
+        wifi_time_resync();
+        ui_clock_refresh_now();
+        ESP_LOGI(TAG, "sync requested");
+        return;
+    }
     if (strncmp(line, "PAGE ", 5) == 0) {
         int p = atoi(line + 5);
         ui_clock_hide_info();

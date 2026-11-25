@@ -663,6 +663,16 @@ static void page2_cb(lv_event_t *e)
     hide_page2();
 }
 
+static void sync_cb(lv_event_t *e)
+{
+    (void)e;
+    weather_refresh_now();
+    wifi_time_resync();
+    if (s_p2_net) {
+        lv_label_set_text(s_p2_net, "SYNC...");
+    }
+}
+
 static void tap_cb(lv_event_t *e)
 {
     (void)e;
@@ -738,6 +748,20 @@ static void show_page2(void)
         lv_label_set_text(l2, "SET WIFI");
         lv_obj_set_style_text_font(l2, &lv_font_montserrat_20, 0);
         lv_obj_center(l2);
+
+        lv_obj_t *bsync = lv_button_create(s_page2);
+        lv_obj_set_pos(bsync, 714, 14);
+        lv_obj_set_size(bsync, 58, 58);
+        lv_obj_set_style_radius(bsync, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(bsync, lv_color_hex(0x2F3A45), 0);
+        lv_obj_set_style_border_width(bsync, 0, 0);
+        lv_obj_set_style_shadow_width(bsync, 0, 0);
+        lv_obj_add_event_cb(bsync, sync_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_t *lsync = lv_label_create(bsync);
+        lv_label_set_text(lsync, LV_SYMBOL_REFRESH);
+        lv_obj_set_style_text_font(lsync, &lv_font_montserrat_28, 0);
+        lv_obj_set_style_text_color(lsync, lv_color_hex(0xCFE3F5), 0);
+        lv_obj_center(lsync);
 
         lv_obj_t *hint = lv_label_create(s_page2);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_16, 0);

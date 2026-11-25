@@ -41,6 +41,92 @@ static bool s_has_hl;
 static char s_sunrise[8] = "";
 static weather_hour_t s_hours[48];
 static int s_hour_count;
+static uint32_t s_updated;
+
+#define NVS_WCACHE   "wcache"
+#define WCACHE_MAGIC 0x57433031u   /* "WC01" */
+
+typedef struct {
+    uint32_t magic;
+    uint32_t updated;
+    int32_t now_temp;
+    int32_t now_code;
+    int32_t hi;
+    int32_t lo;
+    uint8_t has_hl;
+    char sunrise[8];
+    char city[40];
+    char text[40];
+    int32_t hour_count;
+    weather_hour_t hours[48];
+} weather_cache_t;
+
+static void cache_save(void)
+{
+    weather_cache_t *c = heap_caps_malloc(sizeof(*c), MALLOC_CAP_SPIRAM);
+    if (!c) {
+        return;
+    }
+    memset(c, 0, sizeof(*c));
+    c->magic = WCACHE_MAGIC;
+    c->updated = s_updated;
+    c->now_temp = s_now_temp;
+    c->now_code = s_now_code;
+    c->hi = s_hi;
+    c->lo = s_lo;
+    c->has_hl = s_has_hl ? 1 : 0;
+    snprintf(c->sunrise, sizeof(c->sunrise), "%s", s_sunrise);
+    snprintf(c->city, sizeof(c->city), "%s", s_city);
+    snprintf(c->text, sizeof(c->text), "%s", s_text);
+    c->hour_count = s_hour_count > 48 ? 48 : s_hour_count;
+    memcpy(c->hours, s_hours, sizeof(weather_hour_t) * c->hour_count);
+
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_blob(h, NVS_WCACHE, c, sizeof(*c));
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    heap_caps_free(c);
+}
+
+static bool cache_load(void)
+{
+    weather_cache_t *c = heap_caps_malloc(sizeof(*c), MALLOC_CAP_SPIRAM);
+    if (!c) {
+        return false;
+    }
+    bool ok = false;
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+        size_t len = sizeof(*c);
+        if (nvs_get_blob(h, NVS_WCACHE, c, &len) == ESP_OK && len >= sizeof(*c) - 16 &&
+            c->magic == WCACHE_MAGIC) {
+            s_now_temp = c->now_temp;
+            s_now_code = c->now_code;
+            s_hi = c->hi;
+            s_lo = c->lo;
+            s_has_hl = c->has_hl != 0;
+            s_has = c->text[0] != '\0';
+            snprintf(s_sunrise, sizeof(s_sunrise), "%s", c->sunrise);
+            snprintf(s_city, sizeof(s_city), "%s", c->city);
+            snprintf(s_text, sizeof(s_text), "%s", c->text);
+            s_hour_count = c->hour_count;
+            if (s_hour_count < 0) {
+                s_hour_count = 0;
+            }
+            if (s_hour_count > 48) {
+                s_hour_count = 48;
+            }
+            memcpy(s_hours, c->hours, sizeof(weather_hour_t) * s_hour_count);
+            s_updated = c->updated;
+            ok = s_has;
+        }
+        nvs_close(h);
+    }
+    heap_caps_free(c);
+    return ok;
+}
 
 static const char *wmo_cn(int code)
 {
@@ -318,6 +404,10 @@ static bool fetch_once(void)
             }
 
             ok = s_has;
+            if (ok) {
+                s_updated = (uint32_t)time(NULL);
+                cache_save();
+            }
             ESP_LOGI(TAG, "weather: %s hi=%d lo=%d sunrise=%s hours=%d (%d bytes)",
                      s_text, s_hi, s_lo, s_sunrise, s_hour_count, total);
         } else {
@@ -383,6 +473,10 @@ void weather_start(void)
             s_city[0] = '\0';
         }
         nvs_close(h);
+    }
+    if (cache_load()) {
+        ESP_LOGI(TAG, "restored cached weather: %s (%u)", s_text, (unsigned)s_updated);
+        ui_clock_refresh_weather();
     }
     ESP_LOGI(TAG, "location %.4f, %.4f", s_lat, s_lon);
     xTaskCreate(weather_task, "weather", 8192, NULL, 3, NULL);
@@ -523,4 +617,9 @@ int weather_hourly_next(weather_hour_t *out, int max)
         out[n++] = s_hours[i];
     }
     return n;
+}
+
+uint32_t weather_updated_at(void)
+{
+    return s_updated;
 }

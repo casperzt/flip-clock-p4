@@ -141,6 +141,14 @@ static void wifi_task(void *arg)
     vTaskDelete(NULL);
 }
 
+void wifi_time_resync(void)
+{
+    if (esp_sntp_enabled()) {
+        esp_sntp_restart();
+        ESP_LOGI(TAG, "sntp resync requested");
+    }
+}
+
 void wifi_time_start(void)
 {
     esp_err_t err = nvs_flash_init();

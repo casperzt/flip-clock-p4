@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /* 启动后台任务：联网后每 20 分钟拉一次天气 */
 void weather_start(void);
@@ -56,3 +57,6 @@ const char *weather_sunrise(void);
 
 /* 从下一个整点开始的逐小时预报，返回条数 */
 int weather_hourly_next(weather_hour_t *out, int max);
+
+/* 上次成功拉取的时间（epoch），0 表示还没有 */
+uint32_t weather_updated_at(void);

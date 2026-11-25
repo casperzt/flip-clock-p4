@@ -29,6 +29,7 @@ static char s_hl_tmp[64];
 static char s_hour_lbl[6][16];
 static char s_hour_val[6][16];
 static char s_lo_tmp[16];
+static char s_upd_tmp[40];
 
 static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2, int w, lv_color_t c)
 {
@@ -339,6 +340,16 @@ static void redraw(void)
     }
     if (slot == 0) {
         draw_text(&layer, "--", &font_cjk26, dim, 51, 266, 110, LV_TEXT_ALIGN_CENTER);
+    }
+
+    /* 上次更新时间（离线缓存时也能看出数据新旧） */
+    const uint32_t up = weather_updated_at();
+    if (up > 1700000000UL) {
+        time_t t = (time_t)up;
+        struct tm uptm;
+        localtime_r(&t, &uptm);
+        snprintf(s_upd_tmp, sizeof(s_upd_tmp), "updated %02d:%02d", uptm.tm_hour, uptm.tm_min);
+        draw_text(&layer, s_upd_tmp, &font_cjk20, dim, 0, 430, AW, LV_TEXT_ALIGN_CENTER);
     }
 
     lv_canvas_finish_layer(s_canvas, &layer);

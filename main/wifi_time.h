@@ -21,3 +21,6 @@ int wifi_time_scan(wifi_ap_t *out, int max);
 bool wifi_time_connected(void);
 bool wifi_time_synced(void);
 const char *wifi_time_ip(void);
+
+/* 立即重新发起一次 SNTP 对时（已联网时有效） */
+void wifi_time_resync(void);
