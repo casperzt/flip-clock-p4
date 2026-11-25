@@ -803,3 +803,10 @@ void ui_clock_show_info(void)
     show_page2();
     lvgl_port_unlock();
 }
+
+void ui_clock_hide_info(void)
+{
+    lvgl_port_lock(0);
+    hide_page2();
+    lvgl_port_unlock();
+}

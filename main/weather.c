@@ -1,5 +1,6 @@
 #include "weather.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,7 @@
 #include "nvs.h"
 #include "ui_clock.h"
 #include "wifi_time.h"
+#include "clock.h"
 
 #define NVS_NS  "clk"
 #define NVS_LAT "lat"
@@ -29,6 +31,16 @@ static double s_lon = 121.4737;
 static bool s_auto_geo = false;
 static volatile bool s_geo_done;
 static volatile bool s_refresh_req;
+
+static int s_now_temp;
+static int s_now_code;
+static bool s_has;
+static int s_hi;
+static int s_lo;
+static bool s_has_hl;
+static char s_sunrise[8] = "";
+static weather_hour_t s_hours[48];
+static int s_hour_count;
 
 static const char *wmo_cn(int code)
 {
@@ -140,12 +152,79 @@ static bool geo_locate(void)
     return ok;
 }
 
+static int parse_int_list(const char *obj, const char *key, int *out, int max)
+{
+    const char *p = strstr(obj, key);
+    if (!p) {
+        return 0;
+    }
+    p = strchr(p, '[');
+    if (!p) {
+        return 0;
+    }
+    p++;
+    int n = 0;
+    while (n < max && *p && *p != ']') {
+        while (*p == ' ' || *p == ',' || *p == '\n' || *p == '\r') {
+            p++;
+        }
+        if (*p == ']' || !*p) {
+            break;
+        }
+        char *endp = NULL;
+        double v = strtod(p, &endp);
+        if (!endp || endp == p) {
+            break;
+        }
+        out[n++] = (int)lround(v);
+        p = endp;
+    }
+    return n;
+}
+
+static int parse_hour_list(const char *obj, int *out, int max)
+{
+    const char *p = strstr(obj, "\"time\":");
+    if (!p) {
+        return 0;
+    }
+    p = strchr(p, '[');
+    if (!p) {
+        return 0;
+    }
+    p++;
+    int n = 0;
+    while (n < max && *p) {
+        const char *q = strchr(p, '"');
+        if (!q) {
+            break;
+        }
+        const char *t = strchr(q + 1, 'T');
+        if (!t) {
+            break;
+        }
+        out[n++] = atoi(t + 1);
+        const char *e = strchr(t, '"');
+        if (!e) {
+            break;
+        }
+        p = e + 1;
+        if (*p == ']') {
+            break;
+        }
+    }
+    return n;
+}
+
 static bool fetch_once(void)
 {
-    char url[256];
+    char url[320];
     snprintf(url, sizeof(url),
              "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
-             "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto",
+             "&current=temperature_2m,relative_humidity_2m,weather_code"
+             "&hourly=temperature_2m,weather_code,is_day"
+             "&daily=temperature_2m_max,temperature_2m_min,sunrise"
+             "&timezone=auto&forecast_days=2",
              s_lat, s_lon);
 
     esp_http_client_config_t cfg = {
@@ -160,17 +239,25 @@ static bool fetch_once(void)
     esp_http_client_set_header(client, "User-Agent", "flip-clock/1.0");
 
     bool ok = false;
-    char *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
+    const int cap = 16384;
+    char *buf = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM);
     if (!buf) {
         esp_http_client_cleanup(client);
         return false;
     }
 
     if (esp_http_client_open(client, 0) == ESP_OK) {
-        int len = esp_http_client_fetch_headers(client);
-        int r = esp_http_client_read(client, buf, 4095);
-        if (r > 0) {
-            buf[r] = '\0';
+        esp_http_client_fetch_headers(client);
+        int total = 0;
+        while (total < cap - 1) {
+            int r = esp_http_client_read(client, buf + total, cap - 1 - total);
+            if (r <= 0) {
+                break;
+            }
+            total += r;
+        }
+        buf[total] = '\0';
+        if (total > 0) {
             const char *curj = strstr(buf, "\"current\":");
             const char *pt = curj ? strstr(curj, "\"temperature_2m\"") : NULL;
             const char *pc = curj ? strstr(curj, "\"weather_code\"") : NULL;
@@ -180,15 +267,61 @@ static bool fetch_once(void)
                 if (pt && pc) {
                     double temp = strtod(pt + 1, NULL);
                     int code = (int)strtod(pc + 1, NULL);
+                    s_now_temp = (int)lround(temp);
+                    s_now_code = code;
+                    s_has = true;
                     snprintf(s_text, sizeof(s_text), "%.0f°C %s", temp, wmo_cn(code));
-                    ok = true;
-                    ESP_LOGI(TAG, "weather: %s (http %d)", s_text, len);
                 }
-            } else {
-                ESP_LOGW(TAG, "weather fields not found");
             }
+
+            /* 今日最高/最低 + 日出 */
+            const char *dj = strstr(buf, "\"daily\":");
+            if (dj) {
+                int hi[1] = { 0 }, lo[1] = { 0 };
+                if (parse_int_list(dj, "\"temperature_2m_max\"", hi, 1) == 1 &&
+                    parse_int_list(dj, "\"temperature_2m_min\"", lo, 1) == 1) {
+                    s_hi = hi[0];
+                    s_lo = lo[0];
+                    s_has_hl = true;
+                }
+                const char *ps = strstr(dj, "\"sunrise\":");
+                const char *q = ps ? strchr(ps, '"') : NULL;
+                const char *t = q ? strchr(q + 1, 'T') : NULL;
+                if (t) {
+                    snprintf(s_sunrise, sizeof(s_sunrise), "%.5s", t + 1);
+                }
+            }
+
+            /* 逐小时预报 */
+            const char *hj = strstr(buf, "\"hourly\":");
+            if (hj) {
+                int hh[48], ht[48], hc[48], hd[48];
+                int nt = parse_hour_list(hj, hh, 48);
+                int ntemp = parse_int_list(hj, "\"temperature_2m\"", ht, 48);
+                int ncode = parse_int_list(hj, "\"weather_code\"", hc, 48);
+                int nday = parse_int_list(hj, "\"is_day\"", hd, 48);
+                int n = nt;
+                if (ntemp < n) {
+                    n = ntemp;
+                }
+                if (ncode < n) {
+                    n = ncode;
+                }
+                s_hour_count = 0;
+                for (int i = 0; i < n; i++) {
+                    s_hours[s_hour_count].hour = hh[i];
+                    s_hours[s_hour_count].temp = ht[i];
+                    s_hours[s_hour_count].code = hc[i];
+                    s_hours[s_hour_count].is_day = (i < nday) ? (hd[i] != 0) : true;
+                    s_hour_count++;
+                }
+            }
+
+            ok = s_has;
+            ESP_LOGI(TAG, "weather: %s hi=%d lo=%d sunrise=%s hours=%d (%d bytes)",
+                     s_text, s_hi, s_lo, s_sunrise, s_hour_count, total);
         } else {
-            ESP_LOGW(TAG, "read failed: %d", r);
+            ESP_LOGW(TAG, "read failed: %d", total);
         }
         esp_http_client_close(client);
     } else {
@@ -318,4 +451,76 @@ void weather_set_location_name(const char *name)
 {
     snprintf(s_city, sizeof(s_city), "%s", name ? name : "");
     save_location();
+}
+
+bool weather_has_data(void)
+{
+    return s_has;
+}
+
+int weather_temp_now(void)
+{
+    return s_now_temp;
+}
+
+int weather_code_now(void)
+{
+    return s_now_code;
+}
+
+const char *weather_condition(void)
+{
+    return s_has ? wmo_cn(s_now_code) : "";
+}
+
+bool weather_high_low(int *hi, int *lo)
+{
+    if (!s_has_hl) {
+        return false;
+    }
+    if (hi) {
+        *hi = s_hi;
+    }
+    if (lo) {
+        *lo = s_lo;
+    }
+    return true;
+}
+
+const char *weather_sunrise(void)
+{
+    return s_sunrise;
+}
+
+int weather_hourly_next(weather_hour_t *out, int max)
+{
+    struct tm tm;
+    if (!out || max <= 0 || s_hour_count == 0 || clock_get(&tm) != 0) {
+        return 0;
+    }
+
+    int start = -1;
+    for (int i = 0; i + 1 < s_hour_count; i++) {
+        if (s_hours[i].hour <= tm.tm_hour && s_hours[i + 1].hour > tm.tm_hour) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (start < 0) {
+        for (int i = 1; i < s_hour_count; i++) {
+            if (s_hours[i].hour == 0) {
+                start = i;
+                break;
+            }
+        }
+    }
+    if (start < 0) {
+        start = 0;
+    }
+
+    int n = 0;
+    for (int i = start; i < s_hour_count && n < max; i++) {
+        out[n++] = s_hours[i];
+    }
+    return n;
 }

@@ -9,6 +9,7 @@
 #include "esp_lvgl_port.h"
 #include "lunar.h"
 #include "lvgl.h"
+#include "ui_calendar.h"
 #include "ui_clock.h"
 
 #define AW 800
@@ -173,7 +174,7 @@ static void click_cb(lv_event_t *e)
 {
     (void)e;
     ui_analog_show(false);
-    ui_clock_show_info();
+    ui_calendar_show(true);
 }
 
 void ui_analog_init(void)

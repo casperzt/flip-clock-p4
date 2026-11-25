@@ -12,6 +12,8 @@
 #include "freertos/task.h"
 #include "ui_alarm.h"
 #include "ui_analog.h"
+#include "ui_calendar.h"
+#include "ui_weather.h"
 #include "ui_clock.h"
 #include "ui_settings.h"
 #include "screen_stream.h"
@@ -36,6 +38,23 @@ static void handle_cmd(char *line)
         int x = -1, y = -1;
         if (sscanf(line + 4, "%d %d", &x, &y) == 2) {
             screen_tap(x, y);
+        }
+        return;
+    }
+    if (strncmp(line, "PAGE ", 5) == 0) {
+        int p = atoi(line + 5);
+        ui_clock_hide_info();
+        ui_analog_show(false);
+        ui_calendar_show(false);
+        ui_weather_show(false);
+        if (p == 1) {
+            ui_analog_show(true);
+        } else if (p == 2) {
+            ui_calendar_show(true);
+        } else if (p == 3) {
+            ui_weather_show(true);
+        } else if (p == 4) {
+            ui_clock_show_info();
         }
         return;
     }
@@ -200,6 +219,8 @@ void app_main(void)
 
     ui_clock_init(disp);
     ui_analog_init();
+    ui_calendar_init();
+    ui_weather_init();
     alarm_ui_init();
     settings_init();
     display_set_brightness(s_brightness);
