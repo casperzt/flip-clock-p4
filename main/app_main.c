@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ui_alarm.h"
+#include "ui_analog.h"
 #include "ui_clock.h"
 #include "ui_settings.h"
 #include "screen_stream.h"
@@ -198,6 +199,7 @@ void app_main(void)
     ESP_ERROR_CHECK(touch_init(disp));
 
     ui_clock_init(disp);
+    ui_analog_init();
     alarm_ui_init();
     settings_init();
     display_set_brightness(s_brightness);

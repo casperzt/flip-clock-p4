@@ -168,7 +168,7 @@ void lunar_format(const lunar_date_t *l, char *buf, size_t size)
 
 const char *weekday_cn(int wday)
 {
-    static const char *names[] = { "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六" };
+    static const char *names[] = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
     if (wday < 0 || wday > 6) {
         return "";
     }

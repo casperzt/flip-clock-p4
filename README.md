@@ -5,7 +5,9 @@
 ## 功能
 
 - **翻页时钟**：800×480 横屏（软件旋转），深灰卡片、白色数字、铰链细节、上下翻页动画
-- **底部信息**：日期 · 星期 · 农历（含闰月）· 天气；右上角 ALARM + 网络状态
+- **指针表页**：长方形表盘（刻度沿边框、12/3/6/9 长刻度在外侧）、Arial Black 数字、
+  细颈+粗圆头指针、白环+橙环轴心；页面顺序：翻页钟 → 指针表 → INFO → 翻页钟
+- **底部信息**：日期 · 星期（周X）· 农历（含闰月）· 天气；右上角 ALARM + 网络状态
 - **触摸界面**：点空白进 INFO 页（时间/日期/天气/位置/闹钟/网络），可设置闹钟、手动对时、Wi-Fi 扫描配网、城市选择（35 个常用城市）
 - **闹钟**：到点蜂鸣 + 全屏提示，点屏停止；设置保存到 NVS
 - **联网**：ESP32-C6（esp_hosted / esp_wifi_remote）Wi-Fi + SNTP 自动对时；Open-Meteo 天气（可选按 IP 定位）
@@ -14,9 +16,9 @@
 
 ## 截图
 
-| 时钟 | INFO 页 | 位置选择 |
-|---|---|---|
-| ![clock](docs/screenshots/clock.png) | ![info](docs/screenshots/info.png) | ![location](docs/screenshots/location.png) |
+| 翻页钟 | 指针表 | INFO 页 | 位置选择 |
+|---|---|---|---|
+| ![clock](docs/screenshots/clock.png) | ![analog](docs/screenshots/analog.png) | ![info](docs/screenshots/info.png) | ![location](docs/screenshots/location.png) |
 
 Mac 端 USB 遥控窗口（点画面 = 点屏）：
 

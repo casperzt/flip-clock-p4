@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "lunar.h"
 #include "ui_alarm.h"
+#include "ui_analog.h"
 #include "ui_settings.h"
 #include "weather.h"
 #include "wifi_time.h"
@@ -665,7 +666,7 @@ static void page2_cb(lv_event_t *e)
 static void tap_cb(lv_event_t *e)
 {
     (void)e;
-    show_page2();
+    ui_analog_show(true);
 }
 
 static void show_page2(void)
@@ -793,5 +794,12 @@ void ui_clock_redraw(void)
     lvgl_port_lock(0);
     lv_obj_invalidate(lv_screen_active());
     lv_timer_create(redraw_timer_cb, 180, NULL);
+    lvgl_port_unlock();
+}
+
+void ui_clock_show_info(void)
+{
+    lvgl_port_lock(0);
+    show_page2();
     lvgl_port_unlock();
 }
