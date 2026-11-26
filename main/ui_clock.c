@@ -27,7 +27,7 @@ LV_FONT_DECLARE(font_cjk);
 #define C_BIG_FG   0xFFFFFF
 #define C_SM_TOP   0x161719
 #define C_SM_BOT   0x121315
-#define C_SM_FG    0x9BA0A6
+#define C_SM_FG    0x6FA8FF
 #define C_SPLIT    0x26272A
 #define C_HINGE    0x3A3D40
 #define C_SHADOW   0x151618
@@ -42,8 +42,8 @@ LV_FONT_DECLARE(font_cjk);
 #define RENDER_MAX_W 124
 #define RENDER_MAX_H 300
 
-static const int s_big_x[4] = { 32, 166, 324, 458 };
-static const int s_sm_x[2] = { 616, 696 };
+static const int s_big_x[4] = { 28, 162, 334, 468 };
+static const int s_sm_x[2] = { 620, 700 };
 
 typedef struct {
     lv_obj_t *card;
@@ -445,21 +445,25 @@ void ui_clock_init(lv_display_t *disp)
     }
     for (int i = 0; i < 2; i++) {
         card_create(4 + i, s_sm_x[i], SM_Y, SM_W, SM_H, &font_digit_small,
-                    0x9BA0A6, 0x161719, 0x121315);
+                    C_SM_FG, 0x161719, 0x121315);
     }
 
-    /* 冒号 */
-    const int colons[2] = { 307, 599 };
-    for (int c = 0; c < 2; c++) {
-        for (int i = 0; i < 2; i++) {
-            lv_obj_t *dot = lv_obj_create(scr);
-            lv_obj_set_pos(dot, colons[c] - 5, 190 + i * 40);
-            lv_obj_set_size(dot, 10, 10);
-            lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_color(dot, lv_color_hex(0x6E6E6E), 0);
-            lv_obj_set_style_border_width(dot, 0, 0);
-        }
+    /* 时:分 用两个点；分。秒 用一个小圆环 */
+    const int colons[2] = { 310, 606 };
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t *dot = lv_obj_create(scr);
+        lv_obj_set_pos(dot, colons[0] - 5, 190 + i * 40);
+        lv_obj_set_size(dot, 10, 10);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(dot, lv_color_hex(0xE0662E), 0);
+        lv_obj_set_style_border_width(dot, 0, 0);
     }
+    lv_obj_t *sep = lv_obj_create(scr);
+    lv_obj_set_pos(sep, colons[1] - 6, 229);
+    lv_obj_set_size(sep, 12, 12);
+    lv_obj_set_style_radius(sep, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(sep, lv_color_hex(0xE0662E), 0);
+    lv_obj_set_style_border_width(sep, 0, 0);
 
     /* 底部：星期三 · 2026-11-25 · 农历十月十七（居中一行） */
     lv_obj_t *bar = lv_obj_create(scr);

@@ -3,11 +3,13 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
+#include "clock.h"
 #include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
+#include "esp_log.h"
 #include "lvgl.h"
-#include "clock.h"
 #include "ui_clock.h"
 #include "weather.h"
 
@@ -24,12 +26,24 @@ LV_FONT_DECLARE(font_cjk36);
 static lv_obj_t *s_canvas;
 static uint16_t *s_buf;
 static bool s_visible;
+
 static char s_big_tmp[16];
-static char s_hl_tmp[64];
-static char s_hour_lbl[6][16];
-static char s_hour_val[6][16];
-static char s_lo_tmp[16];
-static char s_upd_tmp[40];
+static char s_upd_tmp[32];
+static char s_grid[3][8];
+static char s_ptemp[24][8];
+static char s_phour[24][8];
+static char s_dnum[7][8];
+static char s_dwday[7][24];
+static char s_dhi[7][8];
+static char s_dlo[7][8];
+static char s_hl_hi[8];
+static char s_hl_lo[8];
+
+#define C_WHITE lv_color_hex(0xF2F6FA)
+#define C_GREY  lv_color_hex(0xCFDEEE)
+#define C_DIM   lv_color_hex(0xB9CBDD)
+#define C_GRID  lv_color_hex(0x7C9AB4)
+#define C_ACC   lv_color_hex(0xE0662E)
 
 static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2, int w, lv_color_t c)
 {
@@ -91,133 +105,100 @@ static int text_width(const char *txt, const lv_font_t *f)
 
 /* ---------------- 图标 ---------------- */
 
-static void icon_sun(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
+static void icon_sun(lv_layer_t *l, int cx, int cy, int s)
 {
-    (void)c;
     draw_dot(l, cx, cy, s / 2, lv_color_hex(0xFFC24A));
     for (int i = 0; i < 8; i++) {
         const float a = (float)i * 45.0f * PI / 180.0f;
-        const float x1 = cx + cosf(a) * (s / 2 + 3);
-        const float y1 = cy + sinf(a) * (s / 2 + 3);
-        const float x2 = cx + cosf(a) * (s / 2 + 8);
-        const float y2 = cy + sinf(a) * (s / 2 + 8);
-        draw_line(l, x1, y1, x2, y2, 2, lv_color_hex(0xFFA726));
+        draw_line(l, cx + cosf(a) * (s / 2 + 2), cy + sinf(a) * (s / 2 + 2),
+                  cx + cosf(a) * (s / 2 + 6), cy + sinf(a) * (s / 2 + 6), 2,
+                  lv_color_hex(0xFFA726));
     }
 }
 
-static lv_color_t bg_at(int y)
+static void icon_cloud(lv_layer_t *l, int cx, int cy, int s)
 {
-    if (y < 0) {
-        y = 0;
-    }
-    if (y > AH - 1) {
-        y = AH - 1;
-    }
-    return lv_color_mix(lv_color_hex(0x6C93B8), lv_color_hex(0x3E6185),
-                        (uint8_t)(255 - y * 255 / (AH - 1)));
-}
-
-static void icon_moon(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
-{
-    (void)c;
-    draw_dot(l, cx, cy, s / 2, lv_color_hex(0xF2E2A0));
-    draw_dot(l, cx + s / 3, cy - s / 5, s / 2, bg_at(cy));
-}
-
-static void icon_cloud(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
-{
-    (void)c;
-    const lv_color_t cc = lv_color_hex(0xDCE6F0);
+    const lv_color_t c = lv_color_hex(0xDCE6F0);
     const int r = s / 3;
-    draw_dot(l, cx - r, cy + r / 3, r, cc);
-    draw_dot(l, cx + r / 4, cy - r / 2, r * 4 / 3, cc);
-    draw_dot(l, cx + r * 4 / 3, cy + r / 4, r * 9 / 10, cc);
-    draw_rect(l, cx - r * 2, cy + r / 6, cx + r * 3 / 2, cy + r, r / 2, cc);
+    draw_dot(l, cx - r, cy + r / 3, r, c);
+    draw_dot(l, cx + r / 4, cy - r / 2, r * 4 / 3, c);
+    draw_dot(l, cx + r * 4 / 3, cy + r / 4, r * 9 / 10, c);
+    draw_rect(l, cx - r * 2, cy + r / 6, cx + r * 3 / 2, cy + r, r / 2, c);
 }
 
-static void icon_rain(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
+static void icon_rain(lv_layer_t *l, int cx, int cy, int s)
 {
-    icon_cloud(l, cx, cy - 3, s, c);
+    icon_cloud(l, cx, cy - 2, s);
     for (int i = -1; i <= 1; i++) {
         const int x = cx + i * (s / 3);
-        draw_line(l, x, cy + s / 3, x - 3, cy + s / 3 + 7, 2, lv_color_hex(0x6FB6F2));
+        draw_line(l, x, cy + s / 3, x - 2, cy + s / 3 + 6, 2, lv_color_hex(0x6FB6F2));
     }
 }
 
-static void icon_snow(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
+static void icon_snow(lv_layer_t *l, int cx, int cy, int s)
 {
-    icon_cloud(l, cx, cy - 3, s, c);
+    icon_cloud(l, cx, cy - 2, s);
     for (int i = -1; i <= 1; i++) {
-        draw_dot(l, cx + i * (s / 3), cy + s / 3 + 3, 2, lv_color_hex(0xEAF6FF));
+        draw_dot(l, cx + i * (s / 3), cy + s / 3 + 2, 2, lv_color_hex(0xEAF6FF));
     }
 }
 
-static void icon_fog(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
+static void icon_fog(lv_layer_t *l, int cx, int cy, int s)
 {
-    (void)c;
     for (int i = -1; i <= 1; i++) {
-        draw_line(l, cx - s / 2, cy + i * (s / 4), cx + s / 2 - (i == 1 ? 4 : 0),
-                  cy + i * (s / 4), 3, lv_color_hex(0xB9C4CF));
+        draw_line(l, cx - s / 2, cy + i * (s / 4), cx + s / 2, cy + i * (s / 4), 2,
+                  lv_color_hex(0xB9C4CF));
     }
 }
 
-static void icon_bolt(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
+static void icon_bolt(lv_layer_t *l, int cx, int cy, int s)
 {
-    icon_cloud(l, cx, cy - 4, s, c);
-    draw_line(l, cx + 2, cy + 4, cx - 3, cy + 12, 2, lv_color_hex(0xFFD24A));
-    draw_line(l, cx - 3, cy + 12, cx + 3, cy + 12, 2, lv_color_hex(0xFFD24A));
-    draw_line(l, cx + 3, cy + 12, cx - 2, cy + 20, 2, lv_color_hex(0xFFD24A));
+    icon_cloud(l, cx, cy - 3, s);
+    draw_line(l, cx + 2, cy + 3, cx - 2, cy + 9, 2, lv_color_hex(0xFFD24A));
+    draw_line(l, cx - 2, cy + 9, cx + 2, cy + 9, 2, lv_color_hex(0xFFD24A));
+    draw_line(l, cx + 2, cy + 9, cx - 1, cy + 15, 2, lv_color_hex(0xFFD24A));
 }
 
-static void icon_sunrise(lv_layer_t *l, int cx, int cy, int s, lv_color_t c)
-{
-    (void)c;
-    const int r = s / 3;
-    draw_dot(l, cx, cy, r, lv_color_hex(0xFFC24A));
-    draw_rect(l, cx - r - 1, cy + 1, cx + r + 1, cy + r, 0, bg_at(cy + r));
-    draw_line(l, cx - s / 2, cy + 1, cx + s / 2, cy + 1, 2, lv_color_hex(0xDCE6F0));
-    for (int i = -1; i <= 1; i++) {
-        const float a = (float)i * 35.0f * PI / 180.0f - PI / 2;
-        draw_line(l, cx + cosf(a) * (r + 4), cy + sinf(a) * (r + 4),
-                  cx + cosf(a) * (r + 8), cy + sinf(a) * (r + 8), 2, lv_color_hex(0xFFA726));
-    }
-}
-
-static void icon_for(lv_layer_t *l, int code, bool is_day, int cx, int cy, int s, lv_color_t c)
+static void draw_icon(lv_layer_t *l, int code, int cx, int cy, int s)
 {
     if (code == 0) {
-        if (is_day) {
-            icon_sun(l, cx, cy, s, c);
-        } else {
-            icon_moon(l, cx, cy, s, c);
-        }
+        icon_sun(l, cx, cy, s);
     } else if (code <= 2) {
-        if (is_day) {
-            icon_sun(l, cx - s / 3, cy - s / 3, s * 2 / 3, c);
-        } else {
-            icon_moon(l, cx - s / 3, cy - s / 3, s * 2 / 3, c);
-        }
-        icon_cloud(l, cx + s / 6, cy + s / 6, s * 3 / 4, c);
+        icon_sun(l, cx - s / 3, cy - s / 3, s * 2 / 3);
+        icon_cloud(l, cx + s / 6, cy + s / 6, s * 3 / 4);
     } else if (code == 3) {
-        icon_cloud(l, cx, cy, s, c);
+        icon_cloud(l, cx, cy, s);
     } else if (code >= 45 && code <= 48) {
-        icon_fog(l, cx, cy, s, c);
+        icon_fog(l, cx, cy, s);
     } else if (code >= 51 && code <= 67) {
-        icon_rain(l, cx, cy, s, c);
+        icon_rain(l, cx, cy, s);
     } else if (code >= 71 && code <= 77) {
-        icon_snow(l, cx, cy, s, c);
+        icon_snow(l, cx, cy, s);
     } else if (code >= 80 && code <= 82) {
-        icon_rain(l, cx, cy, s, c);
+        icon_rain(l, cx, cy, s);
     } else if (code >= 85 && code <= 86) {
-        icon_snow(l, cx, cy, s, c);
+        icon_snow(l, cx, cy, s);
     } else if (code >= 95) {
-        icon_bolt(l, cx, cy, s, c);
+        icon_bolt(l, cx, cy, s);
     } else {
-        icon_cloud(l, cx, cy, s, c);
+        icon_cloud(l, cx, cy, s);
     }
 }
 
-/* ---------------- 页面 ---------------- */
+static int weekday_of(int y, int m, int d)
+{
+    static const int t[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+    if (m < 3) {
+        y -= 1;
+    }
+    return (y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7;
+}
+
+static const char *wd_cn(int w)
+{
+    static const char *n[7] = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
+    return n[(w + 7) % 7];
+}
 
 static void redraw(void)
 {
@@ -228,6 +209,7 @@ static void redraw(void)
     lv_layer_t layer;
     lv_canvas_init_layer(s_canvas, &layer);
 
+    /* 背景渐变 */
     lv_draw_rect_dsc_t bg;
     lv_draw_rect_dsc_init(&bg);
     bg.bg_color = lv_color_hex(0x6C93B8);
@@ -243,7 +225,6 @@ static void redraw(void)
     lv_area_t full = { 0, 0, AW - 1, AH - 1 };
     lv_draw_rect(&layer, &bg, &full);
 
-    /* 半透明圆角卡片，模拟例图的玻璃质感 */
     lv_draw_rect_dsc_t card;
     lv_draw_rect_dsc_init(&card);
     card.radius = 30;
@@ -253,103 +234,126 @@ static void redraw(void)
     lv_area_t card_area = { 12, 8, AW - 13, AH - 9 };
     lv_draw_rect(&layer, &card, &card_area);
 
-    const lv_color_t white = lv_color_white();
-    const lv_color_t grey = lv_color_hex(0xCFDEEE);
-    const lv_color_t dim = lv_color_hex(0x9FB6CB);
-
-    /* 左上角：地区 */
+    /* 左上：地区 */
     const char *city = weather_city();
     if (!city || !city[0]) {
         city = "AUTO";
     }
-    draw_text(&layer, city, &font_cjk36, white, 44, 16, 420, LV_TEXT_ALIGN_LEFT);
+    draw_text(&layer, city, &font_cjk36, C_WHITE, 40, 2, 460, LV_TEXT_ALIGN_LEFT);
     int cw = text_width(city, &font_cjk36);
-    if (cw > 380) {
-        cw = 380;
+    if (cw > 360) {
+        cw = 360;
     }
-    const int ax = 44 + cw + 18;
-    const int ay = 40;
-    draw_line(&layer, ax, ay, ax + 10, ay - 10, 3, grey);
-    draw_line(&layer, ax + 4, ay - 10, ax + 10, ay - 10, 3, grey);
-    draw_line(&layer, ax + 10, ay - 6, ax + 10, ay - 10, 3, grey);
+    const int ax = 40 + cw + 14;
+    const int ay = 26;
+    draw_line(&layer, ax, ay, ax + 9, ay - 9, 2, C_GREY);
+    draw_line(&layer, ax + 4, ay - 9, ax + 9, ay - 9, 2, C_GREY);
+    draw_line(&layer, ax + 9, ay - 5, ax + 9, ay - 9, 2, C_GREY);
 
-    /* 当前温度 */
+    /* 大温度 */
     if (weather_has_data()) {
         snprintf(s_big_tmp, sizeof(s_big_tmp), "%d°", weather_temp_now());
     } else {
         snprintf(s_big_tmp, sizeof(s_big_tmp), "--°");
     }
-    draw_text(&layer, s_big_tmp, &font_temp, white, 36, 80, 340, LV_TEXT_ALIGN_LEFT);
+    draw_text(&layer, s_big_tmp, &font_temp, C_WHITE, 32, 54, 320, LV_TEXT_ALIGN_LEFT);
 
-    /* 右上角：天气图标 + 文字 */
-    icon_for(&layer, weather_code_now(), true, 704, 72, 26, white);
-    draw_text(&layer, weather_condition(), &font_cjk26, white, 704 - 100, 102, 200, LV_TEXT_ALIGN_CENTER);
+    /* 右上：天气图标 + 文字 */
+    draw_icon(&layer, weather_code_now(), 704, 30, 22);
+    draw_text(&layer, weather_condition(), &font_cjk20, C_WHITE, 624, 48, 160, LV_TEXT_ALIGN_CENTER);
 
     /* 最高 / 最低 */
     int hi = 0, lo = 0;
     if (weather_high_low(&hi, &lo)) {
-        snprintf(s_hl_tmp, sizeof(s_hl_tmp), "%d°", hi);
-        snprintf(s_lo_tmp, sizeof(s_lo_tmp), "%d°", lo);
-        const int w1 = text_width("最高", &font_cjk20) + 8 + text_width(s_hl_tmp, &font_cjk26);
-        const int w2 = text_width("最低", &font_cjk20) + 8 + text_width(s_lo_tmp, &font_cjk26);
-        int x = 748 - (w1 + 26 + w2);
-        draw_text(&layer, "最高", &font_cjk20, grey, x, 146, 80, LV_TEXT_ALIGN_LEFT);
-        x += text_width("最高", &font_cjk20) + 8;
-        draw_text(&layer, s_hl_tmp, &font_cjk26, white, x, 142, 60, LV_TEXT_ALIGN_LEFT);
-        x += text_width(s_hl_tmp, &font_cjk26) + 26;
-        draw_text(&layer, "最低", &font_cjk20, grey, x, 146, 80, LV_TEXT_ALIGN_LEFT);
-        x += text_width("最低", &font_cjk20) + 8;
-        draw_text(&layer, s_lo_tmp, &font_cjk26, white, x, 142, 60, LV_TEXT_ALIGN_LEFT);
+        snprintf(s_hl_hi, sizeof(s_hl_hi), "%d°", hi);
+        snprintf(s_hl_lo, sizeof(s_hl_lo), "%d°", lo);
+        const int w1 = text_width("最高", &font_cjk20) + 6 + text_width(s_hl_hi, &font_cjk26);
+        const int w2 = text_width("最低", &font_cjk20) + 6 + text_width(s_hl_lo, &font_cjk26);
+        int x = 748 - (w1 + 22 + w2);
+        draw_text(&layer, "最高", &font_cjk20, C_GREY, x, 76, 80, LV_TEXT_ALIGN_LEFT);
+        x += text_width("最高", &font_cjk20) + 6;
+        draw_text(&layer, s_hl_hi, &font_cjk26, C_WHITE, x, 72, 60, LV_TEXT_ALIGN_LEFT);
+        x += text_width(s_hl_hi, &font_cjk26) + 22;
+        draw_text(&layer, "最低", &font_cjk20, C_GREY, x, 76, 80, LV_TEXT_ALIGN_LEFT);
+        x += text_width("最低", &font_cjk20) + 6;
+        draw_text(&layer, s_hl_lo, &font_cjk26, C_WHITE, x, 72, 60, LV_TEXT_ALIGN_LEFT);
     }
 
-    /* 逐小时预报；日出按时间顺序插入，并在日出后不再显示 */
-    weather_hour_t hrs[8];
-    const int n = weather_hourly_next(hrs, 8);
-    const char *ss = weather_sunrise();
-    int sh = -1, sm = 0;
-    if (ss[0]) {
-        sscanf(ss, "%d:%d", &sh, &sm);
-    }
-    struct tm nowtm;
-    const bool now_ok = (clock_get(&nowtm) == 0);
-    const int sun_minutes = (sh >= 0) ? (sh * 60 + sm) : -1;
-    bool sun_pending = (sun_minutes >= 0 && now_ok &&
-                        sun_minutes > nowtm.tm_hour * 60 + nowtm.tm_min);
-
-    int slot = 0;
-    for (int i = 0; i < n && slot < 6; i++) {
-        if (sun_pending && sun_minutes <= hrs[i].hour * 60) {
-            const int cx = 106 + slot * 118;
-            draw_text(&layer, ss, &font_cjk26, white, cx - 55, 206, 110, LV_TEXT_ALIGN_CENTER);
-            icon_sunrise(&layer, cx, 266, 26, white);
-            snprintf(s_hour_val[slot], sizeof(s_hour_val[slot]), "%d°", hrs[i].temp);
-            draw_text(&layer, s_hour_val[slot], &font_cjk, white, cx - 55, 300, 110, LV_TEXT_ALIGN_CENTER);
-            slot++;
-            sun_pending = false;
+    /* ---------- 24 小时曲线 ---------- */
+    weather_hour_t hrs[24];
+    const int n = weather_hourly_next(hrs, 24);
+    if (n >= 2) {
+        int tmin = hrs[0].temp, tmax = hrs[0].temp;
+        for (int i = 1; i < n; i++) {
+            if (hrs[i].temp < tmin) {
+                tmin = hrs[i].temp;
+            }
+            if (hrs[i].temp > tmax) {
+                tmax = hrs[i].temp;
+            }
         }
-        if (slot >= 6) {
-            break;
+        if (tmax == tmin) {
+            tmax = tmin + 1;
         }
-        const int cx = 106 + slot * 118;
-        snprintf(s_hour_lbl[slot], sizeof(s_hour_lbl[slot]), "%d时", hrs[i].hour);
-        draw_text(&layer, s_hour_lbl[slot], &font_cjk26, white, cx - 55, 206, 110, LV_TEXT_ALIGN_CENTER);
-        icon_for(&layer, hrs[i].code, hrs[i].is_day, cx, 266, 26, white);
-        snprintf(s_hour_val[slot], sizeof(s_hour_val[slot]), "%d°", hrs[i].temp);
-        draw_text(&layer, s_hour_val[slot], &font_cjk, white, cx - 55, 300, 110, LV_TEXT_ALIGN_CENTER);
-        slot++;
-    }
-    if (slot == 0) {
-        draw_text(&layer, "--", &font_cjk26, dim, 51, 266, 110, LV_TEXT_ALIGN_CENTER);
+
+        const int X0 = 72, X1 = 752, Y0 = 138, Y1 = 220;
+        for (int g = 0; g <= 2; g++) {
+            const int t = tmax - (tmax - tmin) * g / 2;
+            const int y = Y0 + (Y1 - Y0) * g / 2;
+            snprintf(s_grid[g], sizeof(s_grid[g]), "%d°", t);
+            draw_text(&layer, s_grid[g], &font_cjk20, C_GREY, 8, y - 11, 58, LV_TEXT_ALIGN_RIGHT);
+        }
+
+        int px[24], py[24];
+        for (int i = 0; i < n; i++) {
+            px[i] = X0 + (X1 - X0) * i / (n - 1);
+            py[i] = Y1 - (hrs[i].temp - tmin) * (Y1 - Y0) / (tmax - tmin);
+        }
+        for (int i = 1; i < n; i++) {
+            draw_line(&layer, px[i - 1], py[i - 1], px[i], py[i], 3, C_WHITE);
+        }
+        for (int i = 0; i < n; i++) {
+            draw_dot(&layer, px[i], py[i], 3, C_WHITE);
+            if (i > 0 && i % 3 == 0) {
+                snprintf(s_ptemp[i], sizeof(s_ptemp[i]), "%d°", hrs[i].temp);
+                draw_text(&layer, s_ptemp[i], &font_cjk20, C_WHITE, px[i] - 30, py[i] - 30, 60, LV_TEXT_ALIGN_CENTER);
+                snprintf(s_phour[i], sizeof(s_phour[i]), "%d时", hrs[i].hour);
+                draw_text(&layer, s_phour[i], &font_cjk26, C_DIM, px[i] - 34, 224, 68, LV_TEXT_ALIGN_CENTER);
+            }
+        }
+    } else {
+        draw_text(&layer, "--", &font_cjk20, C_DIM, 360, 180, 80, LV_TEXT_ALIGN_CENTER);
     }
 
-    /* 上次更新时间（离线缓存时也能看出数据新旧） */
+    /* ---------- 未来 7 天 ---------- */
+    weather_day_t days[7];
+    const int nd = weather_daily(days, 7);
+    for (int i = 0; i < nd; i++) {
+        const int cx = 74 + i * 108;
+        snprintf(s_dnum[i], sizeof(s_dnum[i]), "%d", days[i].day);
+        draw_text(&layer, s_dnum[i], &font_cjk26, C_WHITE, cx - 50, 276, 100, LV_TEXT_ALIGN_CENTER);
+        if (i == 0) {
+            draw_rect(&layer, cx - 13, 305, cx + 13, 308, 2, C_ACC);
+        }
+        snprintf(s_dwday[i], sizeof(s_dwday[i]), "%s", wd_cn(weekday_of(days[i].year, days[i].month, days[i].day)));
+        draw_text(&layer, s_dwday[i], &font_cjk20, C_DIM, cx - 50, 312, 100, LV_TEXT_ALIGN_CENTER);
+
+        draw_icon(&layer, days[i].code, cx, 352, 22);
+
+        snprintf(s_dhi[i], sizeof(s_dhi[i]), "%d°", days[i].hi);
+        draw_text(&layer, s_dhi[i], &font_cjk26, C_WHITE, cx - 50, 370, 100, LV_TEXT_ALIGN_CENTER);
+        snprintf(s_dlo[i], sizeof(s_dlo[i]), "%d°", days[i].lo);
+        draw_text(&layer, s_dlo[i], &font_cjk20, C_DIM, cx - 50, 402, 100, LV_TEXT_ALIGN_CENTER);
+    }
+
+    /* 更新时间 */
     const uint32_t up = weather_updated_at();
     if (up > 1700000000UL) {
         time_t t = (time_t)up;
-        struct tm uptm;
-        localtime_r(&t, &uptm);
-        snprintf(s_upd_tmp, sizeof(s_upd_tmp), "updated %02d:%02d", uptm.tm_hour, uptm.tm_min);
-        draw_text(&layer, s_upd_tmp, &font_cjk20, dim, 0, 430, AW, LV_TEXT_ALIGN_CENTER);
+        struct tm tm;
+        localtime_r(&t, &tm);
+        snprintf(s_upd_tmp, sizeof(s_upd_tmp), "updated %02d:%02d", tm.tm_hour, tm.tm_min);
+        draw_text(&layer, s_upd_tmp, &font_cjk20, C_DIM, 0, 442, AW, LV_TEXT_ALIGN_CENTER);
     }
 
     lv_canvas_finish_layer(s_canvas, &layer);
@@ -391,7 +395,7 @@ void ui_weather_init(void)
     lv_obj_add_flag(s_canvas, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_canvas, click_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_flag(s_canvas, LV_OBJ_FLAG_HIDDEN);
-    lv_timer_create(timer_cb, 30000, NULL);
+    lv_timer_create(timer_cb, 60000, NULL);
     lvgl_port_unlock();
 }
 

@@ -39,6 +39,15 @@ typedef struct {
     bool is_day; /* 白天/夜间 */
 } weather_hour_t;
 
+typedef struct {
+    int hi;       /* 最高 °C */
+    int lo;       /* 最低 °C */
+    int code;     /* WMO 天气代码 */
+    int year;     /* 2026 */
+    int month;    /* 1-12 */
+    int day;      /* 1-31 */
+} weather_day_t;
+
 /* 是否已经拿到过数据 */
 bool weather_has_data(void);
 
@@ -57,6 +66,9 @@ const char *weather_sunrise(void);
 
 /* 从下一个整点开始的逐小时预报，返回条数 */
 int weather_hourly_next(weather_hour_t *out, int max);
+
+/* 未来 7 天预报，返回条数 */
+int weather_daily(weather_day_t *out, int max);
 
 /* 上次成功拉取的时间（epoch），0 表示还没有 */
 uint32_t weather_updated_at(void);

@@ -42,9 +42,11 @@ static char s_sunrise[8] = "";
 static weather_hour_t s_hours[48];
 static int s_hour_count;
 static uint32_t s_updated;
+static weather_day_t s_days[7];
+static int s_day_count;
 
 #define NVS_WCACHE   "wcache"
-#define WCACHE_MAGIC 0x57433031u   /* "WC01" */
+#define WCACHE_MAGIC 0x57433032u   /* "WC02" */
 
 typedef struct {
     uint32_t magic;
@@ -59,6 +61,8 @@ typedef struct {
     char text[40];
     int32_t hour_count;
     weather_hour_t hours[48];
+    int32_t day_count;
+    weather_day_t days[7];
 } weather_cache_t;
 
 static void cache_save(void)
@@ -80,6 +84,8 @@ static void cache_save(void)
     snprintf(c->text, sizeof(c->text), "%s", s_text);
     c->hour_count = s_hour_count > 48 ? 48 : s_hour_count;
     memcpy(c->hours, s_hours, sizeof(weather_hour_t) * c->hour_count);
+    c->day_count = s_day_count > 7 ? 7 : s_day_count;
+    memcpy(c->days, s_days, sizeof(weather_day_t) * c->day_count);
 
     nvs_handle_t h;
     if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
@@ -119,6 +125,14 @@ static bool cache_load(void)
                 s_hour_count = 48;
             }
             memcpy(s_hours, c->hours, sizeof(weather_hour_t) * s_hour_count);
+            s_day_count = c->day_count;
+            if (s_day_count < 0) {
+                s_day_count = 0;
+            }
+            if (s_day_count > 7) {
+                s_day_count = 7;
+            }
+            memcpy(s_days, c->days, sizeof(weather_day_t) * s_day_count);
             s_updated = c->updated;
             ok = s_has;
         }
@@ -302,6 +316,43 @@ static int parse_hour_list(const char *obj, int *out, int max)
     return n;
 }
 
+static int parse_date_list(const char *obj, weather_day_t *out, int max)
+{
+    const char *p = strstr(obj, "\"time\":");
+    if (!p) {
+        return 0;
+    }
+    p = strchr(p, '[');
+    if (!p) {
+        return 0;
+    }
+    p++;
+    int n = 0;
+    while (n < max && *p) {
+        const char *q = strchr(p, '"');
+        if (!q) {
+            break;
+        }
+        int y = 0, m = 0, d = 0;
+        if (sscanf(q + 1, "%d-%d-%d", &y, &m, &d) != 3) {
+            break;
+        }
+        out[n].year = y;
+        out[n].month = m;
+        out[n].day = d;
+        n++;
+        const char *e = strchr(q + 1, '"');
+        if (!e) {
+            break;
+        }
+        p = e + 1;
+        if (*p == ']') {
+            break;
+        }
+    }
+    return n;
+}
+
 static bool fetch_once(void)
 {
     char url[320];
@@ -309,8 +360,8 @@ static bool fetch_once(void)
              "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
              "&current=temperature_2m,relative_humidity_2m,weather_code"
              "&hourly=temperature_2m,weather_code,is_day"
-             "&daily=temperature_2m_max,temperature_2m_min,sunrise"
-             "&timezone=auto&forecast_days=2",
+             "&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise"
+             "&timezone=auto&forecast_days=7",
              s_lat, s_lon);
 
     esp_http_client_config_t cfg = {
@@ -360,14 +411,37 @@ static bool fetch_once(void)
                 }
             }
 
-            /* 今日最高/最低 + 日出 */
+            /* 每日预报（7 天）+ 日出 */
             const char *dj = strstr(buf, "\"daily\":");
             if (dj) {
-                int hi[1] = { 0 }, lo[1] = { 0 };
-                if (parse_int_list(dj, "\"temperature_2m_max\"", hi, 1) == 1 &&
-                    parse_int_list(dj, "\"temperature_2m_min\"", lo, 1) == 1) {
-                    s_hi = hi[0];
-                    s_lo = lo[0];
+                int hi[7] = { 0 }, lo[7] = { 0 }, dc[7] = { 0 };
+                weather_day_t tmp[7] = { 0 };
+                int nh = parse_int_list(dj, "\"temperature_2m_max\"", hi, 7);
+                int nl = parse_int_list(dj, "\"temperature_2m_min\"", lo, 7);
+                int nc = parse_int_list(dj, "\"weather_code\"", dc, 7);
+                int nd = parse_date_list(dj, tmp, 7);
+                int nn = nh;
+                if (nl < nn) {
+                    nn = nl;
+                }
+                if (nc < nn) {
+                    nn = nc;
+                }
+                if (nd < nn) {
+                    nn = nd;
+                }
+                s_day_count = nn;
+                for (int i = 0; i < nn; i++) {
+                    s_days[i].hi = hi[i];
+                    s_days[i].lo = lo[i];
+                    s_days[i].code = dc[i];
+                    s_days[i].year = tmp[i].year;
+                    s_days[i].month = tmp[i].month;
+                    s_days[i].day = tmp[i].day;
+                }
+                if (nn > 0) {
+                    s_hi = s_days[0].hi;
+                    s_lo = s_days[0].lo;
                     s_has_hl = true;
                 }
                 const char *ps = strstr(dj, "\"sunrise\":");
@@ -622,4 +696,14 @@ int weather_hourly_next(weather_hour_t *out, int max)
 uint32_t weather_updated_at(void)
 {
     return s_updated;
+}
+
+int weather_daily(weather_day_t *out, int max)
+{
+    if (!out || max <= 0) {
+        return 0;
+    }
+    int n = s_day_count < max ? s_day_count : max;
+    memcpy(out, s_days, sizeof(weather_day_t) * n);
+    return n;
 }
