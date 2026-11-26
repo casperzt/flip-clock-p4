@@ -384,6 +384,7 @@ void nes_emulate(void)
          /* TODO: dim the screen, and pause/silence the apu */
          system_video(true);
          frames_to_render = 0;
+         osd_idle();
       }
       else if (frames_to_render > 1)
       {

@@ -762,16 +762,16 @@ static void show_page2(void)
         lv_obj_center(l2);
 
         lv_obj_t *bgame = lv_button_create(s_page2);
-        lv_obj_set_pos(bgame, 40, 18);
-        lv_obj_set_size(bgame, 104, 40);
-        lv_obj_set_style_radius(bgame, 10, 0);
+        lv_obj_set_pos(bgame, 40, 14);
+        lv_obj_set_size(bgame, 58, 58);
+        lv_obj_set_style_radius(bgame, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_color(bgame, lv_color_hex(0x2F3A45), 0);
         lv_obj_set_style_border_width(bgame, 0, 0);
         lv_obj_set_style_shadow_width(bgame, 0, 0);
         lv_obj_add_event_cb(bgame, game_cb, LV_EVENT_CLICKED, NULL);
         lv_obj_t *lgame = lv_label_create(bgame);
         lv_label_set_text(lgame, "GAME");
-        lv_obj_set_style_text_font(lgame, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_font(lgame, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(lgame, lv_color_hex(0xCFE3F5), 0);
         lv_obj_center(lgame);
 
