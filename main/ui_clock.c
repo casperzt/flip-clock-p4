@@ -13,6 +13,7 @@
 #include "lunar.h"
 #include "ui_alarm.h"
 #include "ui_analog.h"
+#include "ui_game.h"
 #include "ui_settings.h"
 #include "weather.h"
 #include "wifi_time.h"
@@ -667,6 +668,13 @@ static void page2_cb(lv_event_t *e)
     hide_page2();
 }
 
+static void game_cb(lv_event_t *e)
+{
+    (void)e;
+    ui_clock_hide_info();
+    ui_game_show(true);
+}
+
 static void sync_cb(lv_event_t *e)
 {
     (void)e;
@@ -752,6 +760,20 @@ static void show_page2(void)
         lv_label_set_text(l2, "SET WIFI");
         lv_obj_set_style_text_font(l2, &lv_font_montserrat_20, 0);
         lv_obj_center(l2);
+
+        lv_obj_t *bgame = lv_button_create(s_page2);
+        lv_obj_set_pos(bgame, 40, 18);
+        lv_obj_set_size(bgame, 104, 40);
+        lv_obj_set_style_radius(bgame, 10, 0);
+        lv_obj_set_style_bg_color(bgame, lv_color_hex(0x2F3A45), 0);
+        lv_obj_set_style_border_width(bgame, 0, 0);
+        lv_obj_set_style_shadow_width(bgame, 0, 0);
+        lv_obj_add_event_cb(bgame, game_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_t *lgame = lv_label_create(bgame);
+        lv_label_set_text(lgame, "GAME");
+        lv_obj_set_style_text_font(lgame, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(lgame, lv_color_hex(0xCFE3F5), 0);
+        lv_obj_center(lgame);
 
         lv_obj_t *bsync = lv_button_create(s_page2);
         lv_obj_set_pos(bsync, 714, 14);

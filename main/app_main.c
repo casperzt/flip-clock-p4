@@ -15,9 +15,11 @@
 #include "ui_calendar.h"
 #include "ui_weather.h"
 #include "ui_clock.h"
+#include "ui_game.h"
 #include "ui_settings.h"
 #include "screen_stream.h"
 #include "weather.h"
+#include "esp_spiffs.h"
 #include "wifi_time.h"
 
 static const char *TAG = "main";
@@ -54,6 +56,7 @@ static void handle_cmd(char *line)
         ui_analog_show(false);
         ui_calendar_show(false);
         ui_weather_show(false);
+        ui_game_show(false);
         if (p == 1) {
             ui_analog_show(true);
         } else if (p == 2) {
@@ -62,6 +65,8 @@ static void handle_cmd(char *line)
             ui_weather_show(true);
         } else if (p == 4) {
             ui_clock_show_info();
+        } else if (p == 5) {
+            ui_game_show(true);
         }
         return;
     }
@@ -220,6 +225,15 @@ void app_main(void)
     ESP_ERROR_CHECK(board_i2c_init());
     clock_init();
 
+    esp_vfs_spiffs_conf_t sp = {
+        .base_path = "/spiffs",
+        .partition_label = "storage",
+        .max_files = 4,
+        .format_if_mount_failed = true,
+    };
+    esp_err_t sperr = esp_vfs_spiffs_register(&sp);
+    ESP_LOGI(TAG, "spiffs: %s", esp_err_to_name(sperr));
+
     lv_display_t *disp = NULL;
     ESP_ERROR_CHECK(display_init(&disp));
     ESP_ERROR_CHECK(touch_init(disp));
@@ -228,6 +242,7 @@ void app_main(void)
     ui_analog_init();
     ui_calendar_init();
     ui_weather_init();
+    ui_game_init();
     alarm_ui_init();
     settings_init();
     display_set_brightness(s_brightness);

@@ -116,6 +116,71 @@ static esp_err_t stream_ctl_get(httpd_req_t *req)
     return httpd_resp_sendstr(req, on ? "on" : "off");
 }
 
+static const char s_game_page[] =
+    "<!doctype html><html><head><meta charset=utf-8>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<title>NES ROM</title><style>"
+    "body{margin:0;background:#0a0b0c;color:#cfe;font:15px system-ui;"
+    "display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}"
+    "input,button{margin:10px;font-size:16px}button{padding:10px 22px;border-radius:10px;"
+    "border:0;background:#2B6CB0;color:#fff}</style></head><body>"
+    "<h3>NES ROM upload</h3>"
+    "<input type=file id=f accept='.nes'>"
+    "<button onclick=up()>Upload</button><div id=s></div>"
+    "<script>"
+    "async function up(){const f=document.getElementById('f').files[0];"
+    "const s=document.getElementById('s');if(!f){s.textContent='choose a .nes file';return;}"
+    "s.textContent='uploading '+Math.round(f.size/1024)+' KB...';"
+    "const r=await fetch('/rom',{method:'PUT',body:f});"
+    "s.textContent=r.ok?'done: '+f.name+' — 回到设备点 GAME':'failed: '+r.status;}"
+    "</script></body></html>";
+
+static esp_err_t game_get(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, s_game_page, sizeof(s_game_page) - 1);
+}
+
+static esp_err_t rom_put(httpd_req_t *req)
+{
+    if (req->content_len <= 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "no body");
+    }
+    ESP_LOGI(TAG, "rom upload start: %d bytes", req->content_len);
+    FILE *f = fopen("/spiffs/game.nes", "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "rom open failed");
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "open failed");
+    }
+    char *buf = malloc(4096);
+    if (!buf) {
+        fclose(f);
+        return httpd_resp_send_500(req);
+    }
+    int left = req->content_len;
+    while (left > 0) {
+        int chunk = left < 4096 ? left : 4096;
+        int r = httpd_req_recv(req, buf, chunk);
+        if (r <= 0) {
+            free(buf);
+            fclose(f);
+            ESP_LOGE(TAG, "rom recv failed: %d left=%d", r, left);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "recv failed");
+        }
+        if (fwrite(buf, 1, r, f) != (size_t)r) {
+            free(buf);
+            fclose(f);
+            ESP_LOGE(TAG, "rom write failed");
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "write failed");
+        }
+        left -= r;
+    }
+    free(buf);
+    fclose(f);
+    ESP_LOGI(TAG, "rom uploaded: %d bytes", req->content_len);
+    return httpd_resp_sendstr(req, "ok");
+}
+
 static esp_err_t root_get(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
@@ -230,7 +295,7 @@ void screen_stream_start(void)
     ESP_LOGI(TAG, "step4: httpd_start...");
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.lru_purge_enable = true;
-    cfg.max_uri_handlers = 4;
+    cfg.max_uri_handlers = 6;
     httpd_handle_t srv = NULL;
     if (httpd_start(&srv, &cfg) != ESP_OK) {
         ESP_LOGE(TAG, "httpd start failed");
@@ -245,6 +310,10 @@ void screen_stream_start(void)
     httpd_register_uri_handler(srv, &uri_snap);
     httpd_register_uri_handler(srv, &uri_tap);
     httpd_register_uri_handler(srv, &uri_stream);
+    httpd_uri_t uri_game = { .uri = "/game", .method = HTTP_GET, .handler = game_get };
+    httpd_uri_t uri_rom = { .uri = "/rom", .method = HTTP_PUT, .handler = rom_put };
+    httpd_register_uri_handler(srv, &uri_game);
+    httpd_register_uri_handler(srv, &uri_rom);
 
     lvgl_port_lock(0);
     s_tap_indev = lv_indev_create();
