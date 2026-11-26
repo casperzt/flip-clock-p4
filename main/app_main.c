@@ -14,6 +14,7 @@
 #include "ui_analog.h"
 #include "ui_calendar.h"
 #include "ui_weather.h"
+#include "ui_calc.h"
 #include "ui_clock.h"
 #include "ui_settings.h"
 #include "screen_stream.h"
@@ -54,6 +55,7 @@ static void handle_cmd(char *line)
         ui_analog_show(false);
         ui_calendar_show(false);
         ui_weather_show(false);
+        ui_calc_show(false);
         if (p == 1) {
             ui_analog_show(true);
         } else if (p == 2) {
@@ -62,6 +64,8 @@ static void handle_cmd(char *line)
             ui_weather_show(true);
         } else if (p == 4) {
             ui_clock_show_info();
+        } else if (p == 5) {
+            ui_calc_show(true);
         }
         return;
     }
@@ -228,6 +232,7 @@ void app_main(void)
     ui_analog_init();
     ui_calendar_init();
     ui_weather_init();
+    ui_calc_init();
     alarm_ui_init();
     settings_init();
     display_set_brightness(s_brightness);

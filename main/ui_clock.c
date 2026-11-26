@@ -13,6 +13,7 @@
 #include "lunar.h"
 #include "ui_alarm.h"
 #include "ui_analog.h"
+#include "ui_calc.h"
 #include "ui_settings.h"
 #include "weather.h"
 #include "wifi_time.h"
@@ -667,6 +668,13 @@ static void page2_cb(lv_event_t *e)
     hide_page2();
 }
 
+static void calc_cb(lv_event_t *e)
+{
+    (void)e;
+    ui_clock_hide_info();
+    ui_calc_show(true);
+}
+
 static void sync_cb(lv_event_t *e)
 {
     (void)e;
@@ -752,6 +760,20 @@ static void show_page2(void)
         lv_label_set_text(l2, "SET WIFI");
         lv_obj_set_style_text_font(l2, &lv_font_montserrat_20, 0);
         lv_obj_center(l2);
+
+        lv_obj_t *bcalc = lv_button_create(s_page2);
+        lv_obj_set_pos(bcalc, 40, 14);
+        lv_obj_set_size(bcalc, 58, 58);
+        lv_obj_set_style_radius(bcalc, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(bcalc, lv_color_hex(0x2F3A45), 0);
+        lv_obj_set_style_border_width(bcalc, 0, 0);
+        lv_obj_set_style_shadow_width(bcalc, 0, 0);
+        lv_obj_add_event_cb(bcalc, calc_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_t *lcalc = lv_label_create(bcalc);
+        lv_label_set_text(lcalc, "CALC");
+        lv_obj_set_style_text_font(lcalc, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(lcalc, lv_color_hex(0xCFE3F5), 0);
+        lv_obj_center(lcalc);
 
         lv_obj_t *bsync = lv_button_create(s_page2);
         lv_obj_set_pos(bsync, 714, 14);
