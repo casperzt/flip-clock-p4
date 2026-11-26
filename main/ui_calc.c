@@ -10,11 +10,16 @@
 #include "ui_clock.h"
 
 LV_FONT_DECLARE(font_calc);
+LV_FONT_DECLARE(font_sqrt);
 LV_FONT_DECLARE(font_cjk20);
 LV_FONT_DECLARE(font_cjk26);
 
 static lv_obj_t *s_page;
 static lv_obj_t *s_disp;
+static lv_obj_t *s_title;
+
+static double s_mem;
+static bool s_mem_set;
 
 static double s_acc;
 static char s_cur[24];
@@ -27,6 +32,9 @@ static bool s_err;
 
 static void update(void)
 {
+    if (s_title) {
+        lv_label_set_text(s_title, s_mem_set ? "CALCULATOR   [M]" : "CALCULATOR");
+    }
     char buf[40];
     if (s_err) {
         snprintf(buf, sizeof(buf), "Error");
@@ -209,6 +217,35 @@ static void on_sign(void)
     update();
 }
 
+static void on_mem(int kind)
+{
+    switch (kind) {
+    case 11: /* MC */
+        s_mem = 0;
+        s_mem_set = false;
+        break;
+    case 12: /* MR */
+        if (s_mem_set) {
+            snprintf(s_cur, sizeof(s_cur), "%.10g", s_mem);
+            s_curlen = (int)strlen(s_cur);
+            s_entering = true;
+            s_err = false;
+        }
+        break;
+    case 13: /* M+ */
+        s_mem += current_value();
+        s_mem_set = true;
+        break;
+    case 14: /* M- */
+        s_mem -= current_value();
+        s_mem_set = true;
+        break;
+    default:
+        break;
+    }
+    update();
+}
+
 static void on_back(void)
 {
     if (s_err) {
@@ -258,6 +295,9 @@ static void key_cb(lv_event_t *e)
     case 8: /* 一元运算 */
         on_unary((int)ch);
         break;
+    case 9: /* 存储 */
+        on_mem((int)ch);
+        break;
     default:
         break;
     }
@@ -284,7 +324,7 @@ static lv_obj_t *mk_key(lv_obj_t *parent, int x, int y, int w, int h, const char
                         (void *)(intptr_t)(((intptr_t)kind << 8) | (unsigned char)ch));
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text(l, txt);
-    lv_obj_set_style_text_font(l, &font_cjk26, 0);
+    lv_obj_set_style_text_font(l, (kind == 8 && ch == 8) ? &font_sqrt : &font_cjk26, 0);
     lv_obj_set_style_text_color(l, lv_color_hex(0xE6EDF3), 0);
     lv_obj_center(l);
     return b;
@@ -308,11 +348,11 @@ void ui_calc_init(void)
     lv_obj_clear_flag(s_page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_page, LV_OBJ_FLAG_CLICKABLE);
 
-    lv_obj_t *title = lv_label_create(s_page);
-    lv_obj_set_style_text_font(title, &font_cjk20, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(0x8AB4F8), 0);
-    lv_label_set_text(title, "CALCULATOR");
-    lv_obj_set_pos(title, 40, 16);
+    s_title = lv_label_create(s_page);
+    lv_obj_set_style_text_font(s_title, &font_cjk20, 0);
+    lv_obj_set_style_text_color(s_title, lv_color_hex(0x8AB4F8), 0);
+    lv_label_set_text(s_title, "CALCULATOR");
+    lv_obj_set_pos(s_title, 40, 16);
 
     s_disp = lv_label_create(s_page);
     lv_obj_set_style_text_font(s_disp, &font_calc, 0);
@@ -323,10 +363,10 @@ void ui_calc_init(void)
     lv_obj_set_style_text_align(s_disp, LV_TEXT_ALIGN_RIGHT, 0);
 
     /* 按键区：4 列 × 6 行 */
-    const int X0 = 40, Y0 = 168, W = 170, H = 44, GX = 16, GY = 6;
+    const int X0 = 40, Y0 = 166, W = 170, H = 38, GX = 16, GY = 4;
     const int xc[4] = { X0, X0 + W + GX, X0 + 2 * (W + GX), X0 + 3 * (W + GX) };
-    const int yr[6] = { Y0, Y0 + H + GY, Y0 + 2 * (H + GY), Y0 + 3 * (H + GY),
-                        Y0 + 4 * (H + GY), Y0 + 5 * (H + GY) };
+    const int yr[7] = { Y0, Y0 + H + GY, Y0 + 2 * (H + GY), Y0 + 3 * (H + GY),
+                        Y0 + 4 * (H + GY), Y0 + 5 * (H + GY), Y0 + 6 * (H + GY) };
 
     const uint32_t C_NUM = 0x16191E;
     const uint32_t C_FN = 0x22262D;
@@ -335,7 +375,7 @@ void ui_calc_init(void)
 
     mk_key(s_page, xc[0], yr[0], W, H, "C", 4, 'C', C_FN);
     mk_key(s_page, xc[1], yr[0], W, H, "<", 5, 0, C_FN);
-    mk_key(s_page, xc[2], yr[0], W, H, "sqrt", 8, 8, C_FN);   /* √ */
+    mk_key(s_page, xc[2], yr[0], W, H, "\xC2\xB2\xE2\x88\x9Ax", 8, 8, C_FN);   /* √ */
     mk_key(s_page, xc[3], yr[0], W, H, "/", 2, '/', C_OP);
 
     mk_key(s_page, xc[0], yr[1], W, H, "7", 0, '7', C_NUM);
@@ -361,6 +401,11 @@ void ui_calc_init(void)
     mk_key(s_page, xc[1], yr[5], W, H, "+/-", 7, 0, C_FN);
     mk_key(s_page, xc[2], yr[5], W, H, "x2", 8, 9, C_FN);
     mk_key(s_page, xc[3], yr[5], W, H, "1/x", 8, 10, C_FN);
+
+    mk_key(s_page, xc[0], yr[6], W, H, "MC", 9, 11, C_FN);
+    mk_key(s_page, xc[1], yr[6], W, H, "MR", 9, 12, C_FN);
+    mk_key(s_page, xc[2], yr[6], W, H, "M+", 9, 13, C_FN);
+    mk_key(s_page, xc[3], yr[6], W, H, "M-", 9, 14, C_FN);
 
     lv_obj_t *back = lv_button_create(s_page);
     lv_obj_set_pos(back, 752, 10);
