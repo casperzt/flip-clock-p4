@@ -324,7 +324,13 @@ static lv_obj_t *mk_key(lv_obj_t *parent, int x, int y, int w, int h, const char
                         (void *)(intptr_t)(((intptr_t)kind << 8) | (unsigned char)ch));
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text(l, txt);
-    lv_obj_set_style_text_font(l, (kind == 8 && ch == 8) ? &font_sqrt : &font_cjk26, 0);
+    const lv_font_t *font = &font_cjk26;
+    if (kind == 8 && ch == 8) {
+        font = &font_sqrt;
+    } else if (kind == 5) {
+        font = &lv_font_montserrat_20;
+    }
+    lv_obj_set_style_text_font(l, font, 0);
     lv_obj_set_style_text_color(l, lv_color_hex(0xE6EDF3), 0);
     lv_obj_center(l);
     return b;
@@ -374,38 +380,61 @@ void ui_calc_init(void)
     const uint32_t C_EQ = 0x2E7D4F;
 
     mk_key(s_page, xc[0], yr[0], W, H, "C", 4, 'C', C_FN);
-    mk_key(s_page, xc[1], yr[0], W, H, "<", 5, 0, C_FN);
-    mk_key(s_page, xc[2], yr[0], W, H, "\xC2\xB2\xE2\x88\x9Ax", 8, 8, C_FN);   /* √ */
+    mk_key(s_page, xc[1], yr[0], W, H, LV_SYMBOL_BACKSPACE, 5, 0, C_FN);
+    {
+        lv_obj_t *bs = mk_key(s_page, xc[2], yr[0], W, H, "", 8, 8, C_FN);
+        lv_obj_t *ic = lv_obj_create(bs);
+        lv_obj_set_size(ic, 52, 30);
+        lv_obj_set_style_bg_opa(ic, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(ic, 0, 0);
+        lv_obj_set_style_pad_all(ic, 0, 0);
+        lv_obj_center(ic);
+        static lv_point_precise_t rad[] = { { 2, 16 }, { 7, 24 }, { 16, 1 }, { 50, 1 } };
+        lv_obj_t *ln = lv_line_create(ic);
+        lv_line_set_points(ln, rad, 4);
+        lv_obj_set_style_line_width(ln, 2, 0);
+        lv_obj_set_style_line_color(ln, lv_color_hex(0xE6EDF3), 0);
+        lv_obj_t *l2 = lv_label_create(ic);
+        lv_label_set_text(l2, "2");
+        lv_obj_set_style_text_font(l2, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(l2, lv_color_hex(0xE6EDF3), 0);
+        lv_obj_set_pos(l2, 0, -4);
+        lv_obj_t *lx = lv_label_create(ic);
+        lv_label_set_text(lx, "x");
+        lv_obj_set_style_text_font(lx, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(lx, lv_color_hex(0xE6EDF3), 0);
+        lv_obj_set_pos(lx, 28, 6);
+    }
     mk_key(s_page, xc[3], yr[0], W, H, "/", 2, '/', C_OP);
 
-    mk_key(s_page, xc[0], yr[1], W, H, "7", 0, '7', C_NUM);
-    mk_key(s_page, xc[1], yr[1], W, H, "8", 0, '8', C_NUM);
-    mk_key(s_page, xc[2], yr[1], W, H, "9", 0, '9', C_NUM);
-    mk_key(s_page, xc[3], yr[1], W, H, "x", 2, '*', C_OP);
+    mk_key(s_page, xc[0], yr[2], W, H, "7", 0, '7', C_NUM);
+    mk_key(s_page, xc[1], yr[2], W, H, "8", 0, '8', C_NUM);
+    mk_key(s_page, xc[2], yr[2], W, H, "9", 0, '9', C_NUM);
+    mk_key(s_page, xc[3], yr[2], W, H, "x", 2, '*', C_OP);
 
-    mk_key(s_page, xc[0], yr[2], W, H, "4", 0, '4', C_NUM);
-    mk_key(s_page, xc[1], yr[2], W, H, "5", 0, '5', C_NUM);
-    mk_key(s_page, xc[2], yr[2], W, H, "6", 0, '6', C_NUM);
-    mk_key(s_page, xc[3], yr[2], W, H, "-", 2, '-', C_OP);
+    mk_key(s_page, xc[0], yr[3], W, H, "4", 0, '4', C_NUM);
+    mk_key(s_page, xc[1], yr[3], W, H, "5", 0, '5', C_NUM);
+    mk_key(s_page, xc[2], yr[3], W, H, "6", 0, '6', C_NUM);
+    mk_key(s_page, xc[3], yr[3], W, H, "-", 2, '-', C_OP);
 
-    mk_key(s_page, xc[0], yr[3], W, H, "1", 0, '1', C_NUM);
-    mk_key(s_page, xc[1], yr[3], W, H, "2", 0, '2', C_NUM);
-    mk_key(s_page, xc[2], yr[3], W, H, "3", 0, '3', C_NUM);
-    mk_key(s_page, xc[3], yr[3], W, H, "+", 2, '+', C_OP);
+    mk_key(s_page, xc[0], yr[4], W, H, "1", 0, '1', C_NUM);
+    mk_key(s_page, xc[1], yr[4], W, H, "2", 0, '2', C_NUM);
+    mk_key(s_page, xc[2], yr[4], W, H, "3", 0, '3', C_NUM);
+    mk_key(s_page, xc[3], yr[4], W, H, "+", 2, '+', C_OP);
 
-    mk_key(s_page, xc[0], yr[4], W * 2 + GX, H, "0", 0, '0', C_NUM);
-    mk_key(s_page, xc[2], yr[4], W, H, ".", 1, 0, C_NUM);
-    mk_key(s_page, xc[3], yr[4], W, H, "=", 3, 0, C_EQ);
+    mk_key(s_page, xc[0], yr[5], W * 2 + GX, H, "0", 0, '0', C_NUM);
+    mk_key(s_page, xc[2], yr[5], W, H, ".", 1, 0, C_NUM);
+    mk_key(s_page, xc[3], yr[5], W, H, "=", 3, 0, C_EQ);
 
-    mk_key(s_page, xc[0], yr[5], W, H, "%", 6, 0, C_FN);
-    mk_key(s_page, xc[1], yr[5], W, H, "+/-", 7, 0, C_FN);
-    mk_key(s_page, xc[2], yr[5], W, H, "x2", 8, 9, C_FN);
-    mk_key(s_page, xc[3], yr[5], W, H, "1/x", 8, 10, C_FN);
+    mk_key(s_page, xc[0], yr[6], W, H, "%", 6, 0, C_FN);
+    mk_key(s_page, xc[1], yr[6], W, H, "+/-", 7, 0, C_FN);
+    mk_key(s_page, xc[2], yr[6], W, H, "x2", 8, 9, C_FN);
+    mk_key(s_page, xc[3], yr[6], W, H, "1/x", 8, 10, C_FN);
 
-    mk_key(s_page, xc[0], yr[6], W, H, "MC", 9, 11, C_FN);
-    mk_key(s_page, xc[1], yr[6], W, H, "MR", 9, 12, C_FN);
-    mk_key(s_page, xc[2], yr[6], W, H, "M+", 9, 13, C_FN);
-    mk_key(s_page, xc[3], yr[6], W, H, "M-", 9, 14, C_FN);
+    mk_key(s_page, xc[0], yr[1], W, H, "MC", 9, 11, C_FN);
+    mk_key(s_page, xc[1], yr[1], W, H, "MR", 9, 12, C_FN);
+    mk_key(s_page, xc[2], yr[1], W, H, "M+", 9, 13, C_FN);
+    mk_key(s_page, xc[3], yr[1], W, H, "M-", 9, 14, C_FN);
 
     lv_obj_t *back = lv_button_create(s_page);
     lv_obj_set_pos(back, 752, 10);
