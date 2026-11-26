@@ -407,34 +407,34 @@ void ui_calc_init(void)
     }
     mk_key(s_page, xc[3], yr[0], W, H, "/", 2, '/', C_OP);
 
-    mk_key(s_page, xc[0], yr[2], W, H, "7", 0, '7', C_NUM);
-    mk_key(s_page, xc[1], yr[2], W, H, "8", 0, '8', C_NUM);
-    mk_key(s_page, xc[2], yr[2], W, H, "9", 0, '9', C_NUM);
-    mk_key(s_page, xc[3], yr[2], W, H, "x", 2, '*', C_OP);
+    mk_key(s_page, xc[0], yr[1], W, H, "7", 0, '7', C_NUM);
+    mk_key(s_page, xc[1], yr[1], W, H, "8", 0, '8', C_NUM);
+    mk_key(s_page, xc[2], yr[1], W, H, "9", 0, '9', C_NUM);
+    mk_key(s_page, xc[3], yr[1], W, H, "x", 2, '*', C_OP);
 
-    mk_key(s_page, xc[0], yr[3], W, H, "4", 0, '4', C_NUM);
-    mk_key(s_page, xc[1], yr[3], W, H, "5", 0, '5', C_NUM);
-    mk_key(s_page, xc[2], yr[3], W, H, "6", 0, '6', C_NUM);
-    mk_key(s_page, xc[3], yr[3], W, H, "-", 2, '-', C_OP);
+    mk_key(s_page, xc[0], yr[2], W, H, "4", 0, '4', C_NUM);
+    mk_key(s_page, xc[1], yr[2], W, H, "5", 0, '5', C_NUM);
+    mk_key(s_page, xc[2], yr[2], W, H, "6", 0, '6', C_NUM);
+    mk_key(s_page, xc[3], yr[2], W, H, "-", 2, '-', C_OP);
 
-    mk_key(s_page, xc[0], yr[4], W, H, "1", 0, '1', C_NUM);
-    mk_key(s_page, xc[1], yr[4], W, H, "2", 0, '2', C_NUM);
-    mk_key(s_page, xc[2], yr[4], W, H, "3", 0, '3', C_NUM);
-    mk_key(s_page, xc[3], yr[4], W, H, "+", 2, '+', C_OP);
+    mk_key(s_page, xc[0], yr[3], W, H, "1", 0, '1', C_NUM);
+    mk_key(s_page, xc[1], yr[3], W, H, "2", 0, '2', C_NUM);
+    mk_key(s_page, xc[2], yr[3], W, H, "3", 0, '3', C_NUM);
+    mk_key(s_page, xc[3], yr[3], W, H, "+", 2, '+', C_OP);
 
-    mk_key(s_page, xc[0], yr[5], W * 2 + GX, H, "0", 0, '0', C_NUM);
-    mk_key(s_page, xc[2], yr[5], W, H, ".", 1, 0, C_NUM);
-    mk_key(s_page, xc[3], yr[5], W, H, "=", 3, 0, C_EQ);
+    mk_key(s_page, xc[0], yr[4], W * 2 + GX, H, "0", 0, '0', C_NUM);
+    mk_key(s_page, xc[2], yr[4], W, H, ".", 1, 0, C_NUM);
+    mk_key(s_page, xc[3], yr[4], W, H, "=", 3, 0, C_EQ);
 
-    mk_key(s_page, xc[0], yr[6], W, H, "%", 6, 0, C_FN);
-    mk_key(s_page, xc[1], yr[6], W, H, "+/-", 7, 0, C_FN);
-    mk_key(s_page, xc[2], yr[6], W, H, "x2", 8, 9, C_FN);
-    mk_key(s_page, xc[3], yr[6], W, H, "1/x", 8, 10, C_FN);
+    mk_key(s_page, xc[0], yr[5], W, H, "%", 6, 0, C_FN);
+    mk_key(s_page, xc[1], yr[5], W, H, "+/-", 7, 0, C_FN);
+    mk_key(s_page, xc[2], yr[5], W, H, "x2", 8, 9, C_FN);
+    mk_key(s_page, xc[3], yr[5], W, H, "1/x", 8, 10, C_FN);
 
-    mk_key(s_page, xc[0], yr[1], W, H, "MC", 9, 11, C_FN);
-    mk_key(s_page, xc[1], yr[1], W, H, "MR", 9, 12, C_FN);
-    mk_key(s_page, xc[2], yr[1], W, H, "M+", 9, 13, C_FN);
-    mk_key(s_page, xc[3], yr[1], W, H, "M-", 9, 14, C_FN);
+    mk_key(s_page, xc[0], yr[6], W, H, "MC", 9, 11, C_FN);
+    mk_key(s_page, xc[1], yr[6], W, H, "MR", 9, 12, C_FN);
+    mk_key(s_page, xc[2], yr[6], W, H, "M+", 9, 13, C_FN);
+    mk_key(s_page, xc[3], yr[6], W, H, "M-", 9, 14, C_FN);
 
     lv_obj_t *back = lv_button_create(s_page);
     lv_obj_set_pos(back, 752, 10);
